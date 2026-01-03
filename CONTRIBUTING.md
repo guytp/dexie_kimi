@@ -550,6 +550,200 @@ Consider extracting services when:
 
 Until then, enjoy the simplicity of the mono-repo!
 
+## Non-Functional Requirements & Expectations
+
+### Performance of Workflow
+
+To maintain development velocity and minimize friction:
+
+**Branch Lifetime:**
+- **Ideal:** Less than 2 days from creation to merge
+- **Maximum:** 1 week (requires justification and approval)
+- **Rationale:** Short-lived branches reduce merge conflicts, keep changes focused, and enable faster feedback loops
+
+**Pull Request Size:**
+- **Ideal:** Under 200 lines of code changes
+- **Acceptable:** 200-500 lines (may require multiple reviewers)
+- **Avoid:** Over 500 lines (should be split into smaller PRs)
+- **Rationale:** Small PRs review faster, catch bugs earlier, and reduce cognitive load on reviewers
+
+**PR Review Time:**
+- **Target:** Review within 24 hours of submission
+- **Escalation:** Tag @here in #pr-reviews if no response after 48 hours
+- **Rationale:** Fast reviews prevent context switching and keep work moving
+
+**Commit Frequency:**
+- **Commit often:** Every logical unit of work (typically 1-3 hours)
+- **Push regularly:** At least once per day to enable CI and backup
+- **Rationale:** Small commits make debugging easier and reduce work loss risk
+
+### Security Implications
+
+Security is everyone's responsibility. Consider these implications in every PR:
+
+**Authentication & Authorization:**
+- Are new endpoints properly protected with appropriate auth checks?
+- Should this feature be available to all users or restricted?
+- Are JWT tokens validated correctly? Are roles checked?
+
+**Data Privacy:**
+- Is any personally identifiable information (PII) being logged or exposed?
+- Are we collecting only the data we need (data minimization)?
+- Are card images and user data properly encrypted at rest?
+
+**Input Validation:**
+- Are all inputs validated and sanitized (SQL injection, XSS prevention)?
+- Are file uploads scanned for malware?
+- Are we protected against mass assignment vulnerabilities?
+
+**Dependencies:**
+- Are new dependencies necessary and from trusted sources?
+- Have dependencies been scanned for known vulnerabilities (`dotnet list package --vulnerable`)?
+- Are NuGet packages pinned to specific versions?
+
+**Secrets Management:**
+- No secrets in code, configuration files, or logs
+- Use environment variables or Azure Key Vault for sensitive data
+- Rotate credentials if there's any suspicion of exposure
+
+**Security Review Checklist:**
+- [ ] Authentication required where appropriate
+- [ ] Authorization checks in place
+- [ ] Input validation on all user inputs
+- [ ] No secrets or credentials in code
+- [ ] Dependencies scanned for vulnerabilities
+- [ ] Sensitive data encrypted at rest and in transit
+- [ ] Security headers configured (CORS, CSP, etc.)
+
+### Reliability Expectations
+
+Dexie must be reliable for Pokémon collectors and sellers who depend on accurate pricing data.
+
+**Backward Compatibility:**
+- **API Changes:** Never break existing API contracts without versioning (e.g., `/v1/`, `/v2/`)
+- **Database Changes:** Always provide backward-compatible migrations; deploy schema changes before code changes
+- **Shared Libraries:** Changes to `Dexie.Shared.*` must be backward compatible or coordinated across all services
+
+**Error Handling:**
+- All external calls (MongoDB, RabbitMQ, HTTP) must have timeout and retry logic
+- Use circuit breakers for external dependencies
+- Log errors with sufficient context for debugging
+- Fail gracefully: return partial data rather than 500 errors where possible
+
+**Monitoring & Observability:**
+- Health endpoints must respond quickly (< 100ms)
+- Log structured data (structured logging with Serilog)
+- Track key metrics: error rates, latency, throughput
+- Set up alerts for anomalies (future: Prometheus/Grafana)
+
+**Graceful Degradation:**
+- If AI analysis fails, still return basic pricing data
+- If image upload fails, allow manual entry
+- Cache frequently accessed data to survive DB outages
+
+**Rollback Plan:**
+- Every deployment must be reversible within 5 minutes
+- Keep previous version ready for immediate rollback
+- Test rollback procedures regularly
+
+### Branch Protection Recommendations
+
+Protect `main` with these GitHub settings:
+
+**Required Status Checks:**
+- [ ] Require status checks to pass before merging
+  - Build must pass
+  - All tests must pass
+  - Code coverage threshold (future: minimum 70%)
+- [ ] Require branches to be up to date before merging
+- [ ] Require conversation resolution before merging
+
+**Pull Request Restrictions:**
+- [ ] Require pull request reviews before merging
+  - Number of required approvals: 1
+  - Require review from Code Owners (future)
+- [ ] Dismiss stale pull request approvals when new commits are pushed
+- [ ] Require approval from specific teams for shared library changes
+- [ ] Require signed commits (future, not currently enforced)
+
+**Administration:**
+- [ ] Include administrators in restrictions (no one commits directly to main)
+- [ ] Restrict pushes that create files larger than 10MB (prevent accidental commits of large binaries)
+
+**Enforcement:**
+These rules apply to everyone, including senior engineers and tech leads. If you need to bypass them (emergency hotfix), you must:
+1. Get verbal approval from another senior engineer
+2. Create PR immediately after hotfix deployment
+3. Document the emergency in the PR description
+4. Schedule post-mortem within 48 hours
+
+### Performance Expectations
+
+**Response Times:**
+- **Health endpoints:** < 100ms
+- **API endpoints:** < 500ms (p95), < 1s (p99)
+- **Price calculations:** < 200ms
+- **Card image processing:** < 5 seconds
+
+**Resource Usage:**
+- **Memory:** Services should stay under 512MB RSS in normal operation
+- **CPU:** Efficient algorithms, avoid O(n²) where possible
+- **Database:** Proper indexes on frequently queried fields, use projections
+- **Caching:** Cache frequently accessed card data (TTL: 5 minutes)
+
+**Optimization Checklist:**
+- [ ] Database queries use appropriate indexes
+- [ ] No N+1 query problems
+- [ ] Async/await used for I/O operations
+- [ ] Large collections paginated
+- [ ] Expensive operations cached
+
+### Documentation Requirements
+
+Significant changes must be documented:
+
+**Code Documentation:**
+- All public classes and methods must have XML documentation
+- Complex algorithms should have comments explaining the "why"
+- Configuration options documented in appsettings.json comments
+
+**Architecture Decisions:**
+Add ADR (Architecture Decision Record) to `/docs/architecture/` for:
+- New technology adoption
+- Significant design pattern changes
+- Major infrastructure changes
+
+**Breaking Changes:**
+Must document in:
+1. PR description (clear migration guide)
+2. `CHANGELOG.md` (when created)
+3. Team Slack channel (#engineering)
+4. Possibly email to affected team members
+
+**Runbooks:**
+Add to `/docs/runbooks/` for:
+- New deployment procedures
+- Troubleshooting guides
+- Recovery procedures
+
+### Continuous Improvement
+
+We continuously refine our process:
+
+**Sprint Retrospectives:**
+- Discuss what's working and what's not
+- Adjust branch protection rules if needed
+- Update these guidelines based on learnings
+
+**Metrics We Track:**
+- PR review time (target: < 24 hours)
+- Branch lifetime (target: < 2 days)
+- Build failure rate (target: < 5%)
+- Time from commit to production (target: < 1 day)
+
+**Process Evolution:**
+This document will evolve. Suggest improvements via PR to this file!
+
 ## License
 
 By contributing to Dexie, you agree that your contributions will be licensed under the project's license (to be determined). We appreciate your contributions and commitment to the UK Pokémon community!
